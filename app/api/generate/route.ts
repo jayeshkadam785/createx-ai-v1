@@ -30,96 +30,80 @@ export async function POST(request: Request) {
       .replace(/[<>]/g, "")
       .slice(0, 80);
 
+    const escapeHtml = (value: string) =>
+      value.replace(/[&<>"']/g, (character) => {
+        const entities: Record<string, string> = {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        };
+
+        return entities[character];
+      });
+
+    const title = escapeHtml(safeTitle);
+    const description = escapeHtml(prompt);
+
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(safeTitle)}</title>
+  <title>${title}</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: Arial, sans-serif;
       color: #172033;
-      background: #f8fafc;
+      background: #f5f7ff;
     }
-
-    nav {
+    header {
       padding: 22px 8%;
-      background: white;
+      background: #ffffff;
       border-bottom: 1px solid #e5e7eb;
-      font-size: 20px;
+      font-size: 22px;
       font-weight: bold;
     }
-
     main {
-      max-width: 1000px;
-      margin: 70px auto;
-      padding: 30px;
+      max-width: 900px;
+      margin: 80px auto;
+      padding: 40px 24px;
       text-align: center;
     }
-
-    .hero {
-      padding: 70px 25px;
-      border-radius: 24px;
-      color: white;
-      background: linear-gradient(135deg, #2563eb, #7c3aed);
-    }
-
     h1 {
-      font-size: clamp(30px, 5vw, 54px);
-      overflow-wrap: anywhere;
+      font-size: clamp(32px, 6vw, 58px);
+      margin-bottom: 20px;
     }
-
     p {
+      color: #5b6475;
+      font-size: 18px;
       line-height: 1.7;
-      overflow-wrap: anywhere;
     }
-
-    .button {
+    a {
       display: inline-block;
-      margin-top: 20px;
+      margin-top: 22px;
       padding: 14px 24px;
-      border-radius: 10px;
-      background: white;
-      color: #4338ca;
+      background: #5b4bff;
+      color: white;
       text-decoration: none;
-      font-weight: bold;
-    }
-
-    #about {
-      padding: 45px 15px;
-    }
-
-    footer {
-      padding: 25px;
-      text-align: center;
-      color: #64748b;
+      border-radius: 10px;
     }
   </style>
 </head>
 <body>
-  <nav>CreateX AI</nav>
-
+  <header>${title}</header>
   <main>
-    <section class="hero">
-      <h1>${escapeHtml(safeTitle)}</h1>
-      <p>Your idea deserves a great online presence.</p>
-      <p>Website concept created with CreateX AI.</p>
-      <a class="button" href="#about">Explore More</a>
-    </section>
-
+    <h1>${title}</h1>
+    <p>${description}</p>
+    <a href="#about">Explore More</a>
     <section id="about">
-      <h2>Built Around Your Idea</h2>
-      <p>${escapeHtml(prompt)}</p>
+      <h2>Welcome to our website</h2>
+      <p>This is your CreateX AI demo website. Customize it as your project grows.</p>
     </section>
   </main>
-
-  <footer>Created with CreateX AI</footer>
 </body>
 </html>`;
 
@@ -128,26 +112,12 @@ export async function POST(request: Request) {
       mode: "demo",
       title: safeTitle,
       html,
-      message: "Demo website created successfully."
+      message: "Demo website created successfully.",
     });
   } catch {
     return NextResponse.json(
-      { error: "Invalid request. Please try again." },
-      { status: 400 }
+      { error: "Unable to generate the website. Please try again." },
+      { status: 500 }
     );
   }
-}
-
-function escapeHtml(value: string): string {
-  const entities: Record<string, string> = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  };
-
-  return value.replace(/[&<>"']/g, (character) => {
-    return entities[character];
-  });
 }
