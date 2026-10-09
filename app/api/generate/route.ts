@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 interface GenerateRequest {
-  prompt?: string;
+  prompt?: string; 
 }
 
 const MODEL = "gemini-3.8-flash";
