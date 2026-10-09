@@ -71,10 +71,28 @@ export async function POST(request: Request) {
           "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
-          model: MODEL,
-          input: `${SYSTEM_PROMPT}\n\nUser website request:\n${prompt}`,
-          store: false,
-        }),
+  model: MODEL,
+  input: `${SYSTEM_PROMPT}
+
+Create a COMPLETE, production-quality single-file HTML website.
+
+Requirements:
+- Include all HTML, CSS, and JavaScript in one file.
+- Include <!DOCTYPE html>, <html>, <head>, and <body>.
+- Make the design responsive for mobile and desktop.
+- Do not use markdown code fences.
+- Do not omit sections or use placeholders.
+- Keep the code concise enough to finish completely.
+- Before responding, ensure all HTML tags and JavaScript blocks are closed.
+
+User request:
+${prompt}`,
+  store: false,
+  generation_config: {
+    max_output_tokens: 12000,
+    thinking_level: "low",
+  },
+}),
         signal: AbortSignal.timeout(45000),
       }
     );
