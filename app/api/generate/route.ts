@@ -7,7 +7,7 @@ interface GenerateRequest {
   prompt?: string; 
 }
 
-const MODEL = "gemini-3.7-flash";
+const MODEL = "gemini-3.5-flash";
 
 const SYSTEM_PROMPT = `
 You are CreateX AI, an expert website generator.
