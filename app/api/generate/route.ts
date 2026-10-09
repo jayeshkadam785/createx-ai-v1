@@ -8,12 +8,10 @@ interface GenerateRequest {
 }
 
 const MODELS = [
-  "gemini-3.8-flash",
-  "gemini-3.7-flash",
+  "gemini-3.5-flash-lite",
   "gemini-3.6-flash",
-  "gemini-3.5-flash",
-  "gemini-flash-latest",
-  "gemini-flash-lite-latest",
+  "gemini-3.7-flash",
+  "gemini-3.8-flash",
 ];
 
 const SYSTEM_PROMPT = `
@@ -24,15 +22,16 @@ Generate a complete, attractive, responsive website using HTML and CSS.
 Requirements:
 - Return ONLY a complete HTML document.
 - Include CSS inside a style tag.
-- No Markdown code fences.
-- Include navbar, hero, useful content sections and footer.
+- Do not use Markdown code fences.
+- Include a navbar, hero section, useful content sections and footer.
 - Use modern typography, spacing, colors, cards and buttons.
-- Make the website responsive on mobile and desktop.
-- Add realistic sample content relevant to the request.
-- Do not claim that visual-only features actually work.
+- Make the website responsive on mobile, tablet and desktop.
+- Include realistic sample content relevant to the user's request.
+- Use accessible HTML and readable CSS.
 - Do not include scripts that access cookies, credentials,
   browser storage or external APIs.
-- Start with <!DOCTYPE html>.
+- Do not claim that features work if they are only visual demonstrations.
+- Start with <!DOCTYPE html> and include html, head and body elements.
 `;
 
 export async function POST(request: Request) {
@@ -67,11 +66,12 @@ export async function POST(request: Request) {
     }
 
     const input = `${SYSTEM_PROMPT}\n\nUser website request:\n${prompt}`;
-
     const errors: string[] = [];
 
     for (const model of MODELS) {
       try {
+        console.log(`Trying Gemini model: ${model}`);
+
         const response = await fetch(
           "https://generativelanguage.googleapis.com/v1beta/interactions",
           {
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
               input,
               store: false,
             }),
-            signal: AbortSignal.timeout(15000),
+            signal: AbortSignal.timeout(12000),
           }
         );
 
@@ -100,49 +100,59 @@ export async function POST(request: Request) {
             message,
           });
 
-          // Authentication, permission or invalid-request errors
-          // will not usually be fixed by changing the model.
           if (
             response.status === 400 ||
             response.status === 401 ||
             response.status === 403
           ) {
-            return NextResponse.json(
-              { error: message },
-              { status: 502 }
-            );
+            errors.push(`${model}: ${message}`);
+
+            // These errors generally need configuration changes,
+            // not another model name.
+            if (
+              response.status === 401 ||
+              response.status === 403
+            ) {
+              break;
+            }
+
+            continue;
           }
 
           errors.push(`${model}: ${message}`);
           continue;
         }
 
-        if (result?.status && result.status !== "completed") {
+        if (
+          result?.status &&
+          result.status !== "completed"
+        ) {
           errors.push(
             `${model}: generation status ${result.status}`
           );
           continue;
         }
 
-        const outputText =
-          typeof result?.output_text === "string"
-            ? result.output_text
-            : Array.isArray(result?.output)
-              ? result.output
-                  .flatMap(
-                    (item: {
-                      content?: Array<{ text?: string }>;
-                    }) =>
-                      Array.isArray(item?.content)
-                        ? item.content
-                        : []
-                  )
-                  .map(
-                    (part: { text?: string }) =>
-                      part.text || ""
-                  )
-                  .join("\n")
-              : "";
+        let outputText = "";
+
+        if (typeof result?.output_text === "string") {
+          outputText = result.output_text;
+        } else if (Array.isArray(result?.output)) {
+          outputText = result.output
+            .flatMap(
+              (item: {
+                content?: Array<{ text?: string }>;
+              }) =>
+                Array.isArray(item?.content)
+                  ? item.content
+                  : []
+            )
+            .map(
+              (part: { text?: string }) =>
+                part.text || ""
+            )
+            .join("\n");
+        }
 
         const html = outputText
           .replace(/^```html\s*/i, "")
@@ -174,23 +184,29 @@ export async function POST(request: Request) {
           model,
           title: title.slice(0, 120),
           html,
-          message: `Website generated successfully using ${model}.`,
+          message: "Your AI-generated website is ready!",
         });
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "Request failed";
+          error instanceof Error
+            ? error.message
+            : "Request failed";
 
-        console.error(`Gemini ${model} request failed:`, message);
+        console.error(
+          `Gemini ${model} request failed:`,
+          message
+        );
+
         errors.push(`${model}: ${message}`);
       }
     }
 
-    console.error("All Gemini models failed:", errors);
+    console.error("Gemini model attempts failed:", errors);
 
     return NextResponse.json(
       {
         error:
-          "All available Gemini models failed or are busy. Please retry shortly. If this continues, check your API key, model access and quota in Google AI Studio.",
+          "Website generation failed for all configured Gemini models. Check the Vercel Function Logs for the actual error. Verify model availability, API key permissions and quota in Google AI Studio.",
       },
       { status: 503 }
     );
@@ -198,7 +214,10 @@ export async function POST(request: Request) {
     console.error("Website generation failed:", error);
 
     return NextResponse.json(
-      { error: "Unable to generate the website. Please try again." },
+      {
+        error:
+          "Unable to generate the website. Please try again.",
+      },
       { status: 500 }
     );
   }
