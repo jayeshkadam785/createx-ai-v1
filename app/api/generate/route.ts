@@ -9,7 +9,7 @@ interface GenerateRequest {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as GenerateRequest;
-    const prompt = body.prompt?.trim();
+    const prompt = body.prompt?.trim(); 
 
     if (!prompt) {
       return NextResponse.json(
