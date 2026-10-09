@@ -9,7 +9,7 @@ interface GenerateRequest {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as GenerateRequest;
-    const prompt = body.prompt?.trim(); 
+    const prompt = body.prompt?.trim();
 
     if (!prompt) {
       return NextResponse.json(
@@ -25,96 +25,100 @@ export async function POST(request: Request) {
       );
     }
 
-    // V1 demo mode: no paid AI API required.
-    const safeTitle = prompt
-      .replace(/[<>]/g, "")
-      .slice(0, 80);
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    const escapeHtml = (value: string) =>
-      value.replace(/[&<>"']/g, (character) => {
-        const entities: Record<string, string> = {
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;",
-        };
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "Gemini API key is missing. Check Vercel Environment Variables." },
+        { status: 500 }
+      );
+    }
 
-        return entities[character];
-      });
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text: `You are CreateX AI, an expert website generator.
+Generate a complete, attractive, responsive website using HTML and CSS.
+Return ONLY the HTML document, with inline CSS inside a style tag.
+Do not use Markdown code fences.
+Include a navbar, hero section, useful content sections, and footer.
+Use a modern design suitable for the user's request.
+Do not include scripts that access cookies, credentials, browser storage, or external APIs.
+Do not claim features work if they are only visual demonstrations.`,
+              },
+            ],
+          },
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 8192,
+          },
+        }),
+      }
+    );
 
-    const title = escapeHtml(safeTitle);
-    const description = escapeHtml(prompt);
+    const result = await response.json();
 
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      color: #172033;
-      background: #f5f7ff;
+    if (!response.ok) {
+      console.error("Gemini API error:", result);
+
+      return NextResponse.json(
+        {
+          error:
+            result?.error?.message ||
+            "Gemini could not generate the website. Please try again.",
+        },
+        { status: response.status === 429 ? 429 : 502 }
+      );
     }
-    header {
-      padding: 22px 8%;
-      background: #ffffff;
-      border-bottom: 1px solid #e5e7eb;
-      font-size: 22px;
-      font-weight: bold;
+
+    const html = result?.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: string }) => part.text || "")
+      .join("")
+      .trim();
+
+    if (!html) {
+      return NextResponse.json(
+        { error: "Gemini returned an empty response. Try a different prompt." },
+        { status: 502 }
+      );
     }
-    main {
-      max-width: 900px;
-      margin: 80px auto;
-      padding: 40px 24px;
-      text-align: center;
-    }
-    h1 {
-      font-size: clamp(32px, 6vw, 58px);
-      margin-bottom: 20px;
-    }
-    p {
-      color: #5b6475;
-      font-size: 18px;
-      line-height: 1.7;
-    }
-    a {
-      display: inline-block;
-      margin-top: 22px;
-      padding: 14px 24px;
-      background: #5b4bff;
-      color: white;
-      text-decoration: none;
-      border-radius: 10px;
-    }
-  </style>
-</head>
-<body>
-  <header>${title}</header>
-  <main>
-    <h1>${title}</h1>
-    <p>${description}</p>
-    <a href="#about">Explore More</a>
-    <section id="about">
-      <h2>Welcome to our website</h2>
-      <p>This is your CreateX AI demo website. Customize it as your project grows.</p>
-    </section>
-  </main>
-</body>
-</html>`;
+
+    const cleanHtml = html
+      .replace(/^```html\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    const titleMatch = cleanHtml.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+
+    const title = titleMatch?.[1]?.replace(/<[^>]*>/g, "").trim()
+      || "CreateX AI Website";
 
     return NextResponse.json({
       success: true,
-      mode: "demo",
-      title: safeTitle,
-      html,
-      message: "Demo website created successfully.",
+      mode: "gemini",
+      title: title.slice(0, 120),
+      html: cleanHtml,
+      message: "Your AI-generated website is ready!",
     });
-  } catch {
+  } catch (error) {
+    console.error("Website generation failed:", error);
+
     return NextResponse.json(
       { error: "Unable to generate the website. Please try again." },
       { status: 500 }
