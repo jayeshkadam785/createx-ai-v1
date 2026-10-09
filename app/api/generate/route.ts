@@ -143,7 +143,9 @@ ${prompt}`,
         { status }
       );
     }
-
+console.log("Gemini response status:", result?.status);
+console.log("Gemini continuation available:", Boolean(result?.continuation_token));
+console.log("Gemini output length:", result?.output_text?.length ?? 0);
     if (result?.status && result.status !== "completed") {
       console.error("Gemini interaction did not complete:", {
         status: result.status,
